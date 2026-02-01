@@ -7397,3 +7397,35 @@ if(bEl) bEl.textContent = data.overview || 'Synopsis non disponible.';
     }
   }, true);
 })();
+// === Auto switch langues selon provider ===
+(function () {
+  function ready(fn){
+    if (document.readyState !== "loading") fn();
+    else document.addEventListener("DOMContentLoaded", fn);
+  }
+
+  ready(function () {
+    var providerSelect = document.getElementById("subtitleSearchProviderSelect");
+    var langInput = document.getElementById("subtitleSearchLangInput");
+
+    if (!providerSelect || !langInput) return;
+
+    var osValue = "fr,en,pt-pt,pt-br";
+    var subdlValue = "FR,EN,PT,BR_PT";
+
+    function syncLangs(){
+      if (providerSelect.value === "subdl") {
+        langInput.value = subdlValue;
+      } else {
+        langInput.value = osValue;
+      }
+    }
+
+    // au changement
+    providerSelect.addEventListener("change", syncLangs);
+
+    // à l’ouverture de l’overlay (cas où il est déjà ouvert)
+    setTimeout(syncLangs, 300);
+  });
+})();
+

@@ -5731,54 +5731,123 @@ function __subdlEnsureApiKey() {
 }
 
 function __subdlNormalizeLanguagesCsv(langsCsv) {
-  const raw = String(langsCsv || '').trim();
+  var raw = String(langsCsv || '').trim();
   if (!raw) return '';
 
-  // Liste officielle SubDL (https://subdl.com/api-files/language_list.json)
-  const VALID = {
-    "AR":1,"BR_PT":1,"DA":1,"NL":1,"EN":1,"FA":1,"FI":1,"FR":1,"ID":1,"IT":1,"NO":1,"RO":1,"ES":1,"SV":1,"VI":1,
-    "SQ":1,"AZ":1,"BE":1,"BN":1,"ZH_BG":1,"BS":1,"BG":1,"BG_EN":1,"MY":1,"CA":1,"ZH":1,"HR":1,"CS":1,"NL_EN":1,
-    "EN_DE":1,"EO":1,"ET":1,"KA":1,"DE":1,"EL":1,"KL":1,"HE":1,"HI":1,"HU":1,"HU_EN":1,"IS":1,"JA":1,"KO":1,
-    "KU":1,"LV":1,"LT":1,"MK":1,"MS":1,"ML":1,"MNI":1,"PL":1,"PT":1,"RU":1,"SR":1,"SI":1,"SK":1,"SL":1,"TL":1,
-    "TA":1,"TE":1,"TH":1,"TR":1,"UK":1,"UR":1
+  // SubDL codes: voir https://subdl.com/api-files/language_list.json
+  // Objectif: accepter tes codes style OpenSubtitles (fr,en,pt-pt,pt-br...) et envoyer uniquement des codes valides SubDL.
+  var SUPPORTED = {
+    "AR": 1,
+    "BR_PT": 1,
+    "DA": 1,
+    "NL": 1,
+    "EN": 1,
+    "FA": 1,
+    "FI": 1,
+    "FR": 1,
+    "ID": 1,
+    "IT": 1,
+    "NO": 1,
+    "RO": 1,
+    "ES": 1,
+    "SV": 1,
+    "VI": 1,
+    "SQ": 1,
+    "AZ": 1,
+    "BE": 1,
+    "BN": 1,
+    "ZH_BG": 1,
+    "BS": 1,
+    "BG": 1,
+    "BG_EN": 1,
+    "MY": 1,
+    "CA": 1,
+    "ZH": 1,
+    "HR": 1,
+    "CS": 1,
+    "NL_EN": 1,
+    "EN_DE": 1,
+    "EO": 1,
+    "ET": 1,
+    "KA": 1,
+    "DE": 1,
+    "EL": 1,
+    "KL": 1,
+    "HE": 1,
+    "HI": 1,
+    "HU": 1,
+    "HU_EN": 1,
+    "IS": 1,
+    "JA": 1,
+    "KO": 1,
+    "KU": 1,
+    "LV": 1,
+    "LT": 1,
+    "MK": 1,
+    "MS": 1,
+    "ML": 1,
+    "MNI": 1,
+    "PL": 1,
+    "PT": 1,
+    "RU": 1,
+    "SR": 1,
+    "SI": 1,
+    "SK": 1,
+    "SL": 1,
+    "TL": 1,
+    "TA": 1,
+    "TE": 1,
+    "TH": 1,
+    "TR": 1,
+    "UK": 1,
+    "UR": 1
   };
 
-  const out = [];
-  const seen = Object.create(null);
+  // Aliases / normalisation (entrée utilisateur -> code SubDL)
+  var ALIAS = {
+    "PT-BR": "BR_PT",
+    "PT_BR": "BR_PT",
+    "PT-PT": "PT",
+    "PT_PT": "PT",
+    "FR-FR": "FR",
+    "EN-US": "EN",
+    "EN-GB": "EN",
+    "ES-ES": "ES",
+    "ES-MX": "ES",
+    "ZH-CN": "ZH",
+    "ZH-TW": "ZH",
+    "ZH_HK": "ZH",
+    "ZH-CN_BG": "ZH_BG",
+    "ZH_BG": "ZH_BG"
+  };
 
-  function push(code) {
-    if (!code) return;
-    if (!VALID[code]) return; // évite "Language error"
-    if (seen[code]) return;
-    seen[code] = 1;
-    out.push(code);
-  }
+  var out = [];
+  var seen = {};
 
-  raw.split(',').forEach((part) => {
-    let s = String(part || '').trim();
-    if (!s) return;
+  raw.split(',').forEach(function (tok) {
+    var t = String(tok || '').trim();
+    if (!t) return;
 
-    // Normalise séparateurs
-    s = s.replace(/\s+/g, '');
-    const sl = s.toLowerCase();
+    // Uppercase et normalise séparateurs
+    t = t.replace(/\s+/g, '');
+    t = t.replace(/-/g, '_');
+    t = t.toUpperCase();
 
-    // Mappings courants (OpenSubtitles-like -> SubDL)
-    if (sl === 'pt-br' || sl === 'pt_br' || sl === 'ptbr') { push('BR_PT'); return; }
-    if (sl === 'pt-pt' || sl === 'pt_pt' || sl === 'ptpt') { push('PT'); return; }
+    if (ALIAS[t]) t = ALIAS[t];
 
-    // Si l'utilisateur a déjà mis un code SubDL
-    const up = s.toUpperCase().replace('-', '_');
-    if (VALID[up]) { push(up); return; }
+    // Beaucoup de cas simples: "FR" / "EN" / "AR" etc.
+    // Si l'utilisateur a donné "fr" -> "FR" etc, c'est déjà upper.
+    if (!SUPPORTED[t]) return;
 
-    // Sinon, on garde le 1er segment (ex: "fr-FR" -> "FR")
-    const base = up.split('_')[0];
-    if (base && VALID[base]) { push(base); return; }
-
-    // rien -> ignoré
+    if (!seen[t]) {
+      seen[t] = 1;
+      out.push(t);
+    }
   });
 
   return out.join(',');
 }
+
 
 function __subdlGuessTypeFromEntry(entry) {
   const t = (entry && (entry.tmdbType || entry.type)) ? String(entry.tmdbType || entry.type).toLowerCase() : '';

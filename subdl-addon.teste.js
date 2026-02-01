@@ -5734,43 +5734,47 @@ function __subdlNormalizeLanguagesCsv(langsCsv) {
   const raw = String(langsCsv || '').trim();
   if (!raw) return '';
 
-  // SubDL utilise une liste de codes propres (ex: EN,FR,AR,PT,BR_PT,ZH_BG,NL_EN...).
-  // Source (liste officielle) : https://subdl.com/api-files/language_list.json
-  // On accepte des saisies user "fr,en,pt-pt,pt-br" et on normalise au format SubDL.
-  const out = [];
-  const seen = new Set();
+  // Liste officielle SubDL (https://subdl.com/api-files/language_list.json)
+  const VALID = {
+    "AR":1,"BR_PT":1,"DA":1,"NL":1,"EN":1,"FA":1,"FI":1,"FR":1,"ID":1,"IT":1,"NO":1,"RO":1,"ES":1,"SV":1,"VI":1,
+    "SQ":1,"AZ":1,"BE":1,"BN":1,"ZH_BG":1,"BS":1,"BG":1,"BG_EN":1,"MY":1,"CA":1,"ZH":1,"HR":1,"CS":1,"NL_EN":1,
+    "EN_DE":1,"EO":1,"ET":1,"KA":1,"DE":1,"EL":1,"KL":1,"HE":1,"HI":1,"HU":1,"HU_EN":1,"IS":1,"JA":1,"KO":1,
+    "KU":1,"LV":1,"LT":1,"MK":1,"MS":1,"ML":1,"MNI":1,"PL":1,"PT":1,"RU":1,"SR":1,"SI":1,"SK":1,"SL":1,"TL":1,
+    "TA":1,"TE":1,"TH":1,"TR":1,"UK":1,"UR":1
+  };
 
-  raw.split(',').forEach(part => {
+  const out = [];
+  const seen = Object.create(null);
+
+  function push(code) {
+    if (!code) return;
+    if (!VALID[code]) return; // évite "Language error"
+    if (seen[code]) return;
+    seen[code] = 1;
+    out.push(code);
+  }
+
+  raw.split(',').forEach((part) => {
     let s = String(part || '').trim();
     if (!s) return;
 
-    const low = s.toLowerCase();
+    // Normalise séparateurs
+    s = s.replace(/\s+/g, '');
+    const sl = s.toLowerCase();
 
-    // Cas fréquents (compat avec ton champ par défaut)
-    if (low === 'pt-br' || low === 'pt_br' || low === 'ptbr' || low === 'br-pt' || low === 'br_pt') {
-      s = 'BR_PT';
-    } else if (low === 'pt-pt' || low === 'pt_pt') {
-      s = 'PT';
-    } else {
-      // Normalisation générique:
-      // - remplace '-' par '_' (ex: zh-bg -> zh_bg)
-      // - met en majuscules
-      s = s.replace(/-/g, '_').toUpperCase();
+    // Mappings courants (OpenSubtitles-like -> SubDL)
+    if (sl === 'pt-br' || sl === 'pt_br' || sl === 'ptbr') { push('BR_PT'); return; }
+    if (sl === 'pt-pt' || sl === 'pt_pt' || sl === 'ptpt') { push('PT'); return; }
 
-      // Si on a un code du style XX_YY mais que SubDL attend XX (ex: FR_FR),
-      // on réduit à XX uniquement.
-      if (/^[A-Z]{2}_[A-Z]{2}$/.test(s) && s !== 'BR_PT') {
-        s = s.slice(0, 2);
-      }
-    }
+    // Si l'utilisateur a déjà mis un code SubDL
+    const up = s.toUpperCase().replace('-', '_');
+    if (VALID[up]) { push(up); return; }
 
-    // On ne garde que les formats plausibles
-    if (!/^[A-Z]{2,3}(_[A-Z]{2,3})?$/.test(s)) return;
+    // Sinon, on garde le 1er segment (ex: "fr-FR" -> "FR")
+    const base = up.split('_')[0];
+    if (base && VALID[base]) { push(base); return; }
 
-    if (!seen.has(s)) {
-      seen.add(s);
-      out.push(s);
-    }
+    // rien -> ignoré
   });
 
   return out.join(',');

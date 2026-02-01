@@ -3225,7 +3225,6 @@ function refreshTrackMenus() {
     activeSubtitleIndex = -1;
     closeAllTrackMenus();
     updateTrackControlsVisibility();
-    try { __subtitleSyncProviderSelectForTab(); } catch {}
     return;
   }
 
@@ -4056,6 +4055,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 scrollToActiveItem();
     updateNowPlayingCounter();
     updateTrackControlsVisibility();
+    try { __subtitleSyncProviderSelectForTab(); } catch {}
   });
 });
 
@@ -5191,23 +5191,33 @@ function __subtitleSetStatus(msg) {
   subtitleSearchStatus.textContent = msg || '';
 }
 
+// =====================================================
+// SubDL (API) — activé uniquement dans l'onglet Films
+// Notes: l'API SubDL renvoie souvent des ZIP (extraction côté navigateur non gérée ici
+// pour éviter d'ajouter une dépendance). Dans ce cas, "Appliquer" demandera de télécharger.
+// =====================================================
 function __subtitleIsFilmsTabActive() {
-  const tab = document.querySelector('.tab-btn.active')?.dataset?.tab || currentListType || '';
-  return tab === 'channels'; // "Film M3U"
+  try {
+    const tab = (typeof getActiveTabKey === 'function' ? getActiveTabKey() : '') || (currentListType || '');
+    return tab === 'channels'; // "Film M3U"
+  } catch {
+    return false;
+  }
 }
 
 function __subtitleSyncProviderSelectForTab() {
   if (!subtitleSearchProviderSelect) return;
+
   const isFilms = __subtitleIsFilmsTabActive();
 
-  // Cherche l'option SubDL
+  // Trouver l'option SubDL si elle existe
   let subOpt = null;
   try {
     subOpt = Array.from(subtitleSearchProviderSelect.options || []).find(o => o && o.value === 'subdl') || null;
   } catch { subOpt = null; }
 
   if (isFilms) {
-    // Films: SubDL visible et disponible
+    // Dans Films: on l'ajoute si besoin
     if (!subOpt) {
       try {
         const opt = document.createElement('option');
@@ -5223,7 +5233,7 @@ function __subtitleSyncProviderSelectForTab() {
       try { subOpt.style.display = ''; } catch {}
     }
   } else {
-    // Hors Films: on masque/désactive SubDL et on force OpenSubtitles
+    // Hors Films: on le masque et on force OpenSubtitles si SubDL était sélectionné
     if (subOpt) {
       try { subOpt.disabled = true; } catch {}
       try { subOpt.hidden = true; } catch {}
@@ -5233,6 +5243,209 @@ function __subtitleSyncProviderSelectForTab() {
       if (subtitleSearchProviderSelect.value === 'subdl') subtitleSearchProviderSelect.value = 'opensubtitles';
     } catch {}
   }
+}
+
+// --- SubDL API helpers ---
+const __SUBDL_API_BASE = 'https://api.subdl.com/api/v1/subtitles';
+const __SUBDL_DL_BASE  = 'https://dl.subdl.com';
+
+function __subdlGetApiKey() {
+  try { return (localStorage.getItem('tronAresSubdlApiKey') || '').trim(); } catch { return ''; }
+}
+
+function __subdlNormalizeLanguagesCsv(langsCsv) {
+  const raw = String(langsCsv || '').trim();
+  if (!raw) return '';
+  return raw.split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(s => s.toUpperCase())
+    .join(',');
+}
+
+function __subdlParseSxxEyy(str) {
+  const s = String(str || '').toUpperCase();
+  const m = s.match(/\bS(\d{1,2})E(\d{1,2})\b/);
+  if (!m) return null;
+  return { season: Number(m[1]), episode: Number(m[2]) };
+}
+
+function __subdlGuessTypeFromEntry(entry, q) {
+  const t = (entry && (entry.tmdbType || entry.type)) ? String(entry.tmdbType || entry.type).toLowerCase() : '';
+  if (t === 'tv' || t === 'show' || t === 'series') return 'tv';
+  if (t === 'movie' || t === 'film') return 'movie';
+  // fallback: si SxxEyy dans le texte => tv
+  const qq = String(q || '').toUpperCase();
+  if (/\bS\d{1,2}E\d{1,2}\b/.test(qq)) return 'tv';
+  return 'movie';
+}
+
+async function __subdlSearchSubtitles(query, languagesCsv, entry) {
+  const apiKey = __subdlGetApiKey();
+  if (!apiKey) throw new Error('Clé SubDL absente (stockée en localStorage: tronAresSubdlApiKey).');
+
+  const params = new URLSearchParams();
+  params.set('api_key', apiKey);
+
+  const langs = __subdlNormalizeLanguagesCsv(languagesCsv);
+  if (langs) params.set('languages', langs);
+
+  const type = __subdlGuessTypeFromEntry(entry, query);
+  if (type) params.set('type', type);
+
+  // Priorité: TMDb ID si présent
+  if (entry && entry.tmdbId) params.set('tmdb_id', String(entry.tmdbId));
+  else if (query) params.set('film_name', String(query));
+
+  // Série: SxxEyy si détecté
+  if (type === 'tv') {
+    const se = __subdlParseSxxEyy(query);
+    if (se) {
+      params.set('season_number', String(se.season));
+      params.set('episode_number', String(se.episode));
+    }
+  }
+
+  params.set('subs_per_page', '30');
+
+  const url = __SUBDL_API_BASE + '?' + params.toString();
+  const res = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data || data.status !== true) {
+    const errMsg = data && (data.error || data.message) ? (data.error || data.message) : ('HTTP ' + res.status);
+    throw new Error('SubDL: ' + errMsg);
+  }
+  return data;
+}
+
+function __subdlGetDownloadLink(sub) {
+  if (!sub || typeof sub !== 'object') return '';
+  const candidates = [
+    sub.link, sub.url, sub.download, sub.download_url, sub.dl, sub.dl_url,
+    sub.subtitle_link, sub.subtitle_url, sub.zip, sub.zip_url, sub.path
+  ].filter(Boolean).map(String);
+
+  for (const c of candidates) {
+    if (/^https?:\/\//i.test(c)) return c;
+    if (c.startsWith('/')) return __SUBDL_DL_BASE.replace(/\/+$/,'') + c;
+    if (c.includes('subtitle/')) return __SUBDL_DL_BASE.replace(/\/+$/,'') + '/' + c.replace(/^\/+/, '');
+  }
+
+  const idA = sub.id || sub.sub_id || sub.subtitle_id || null;
+  const idB = sub.file_id || sub.release_id || null;
+  if (idA && idB) return __SUBDL_DL_BASE.replace(/\/+$/,'') + '/subtitle/' + String(idA) + '-' + String(idB) + '.zip';
+  if (idA) return __SUBDL_DL_BASE.replace(/\/+$/,'') + '/subtitle/' + String(idA) + '.zip';
+  return '';
+}
+
+function __subtitleRenderResultsSubDL(data, langsCsv) {
+  if (!subtitleSearchResults) return;
+
+  const subs = Array.isArray(data?.subtitles) ? data.subtitles : [];
+  if (!subs.length) {
+    __subtitleSetStatus('Aucun sous-titre SubDL trouvé.');
+    return;
+  }
+
+  __subtitleSetStatus(subs.length + ' résultat(s) SubDL.');
+
+  const requested = String(langsCsv || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const pickLang = (lang) => {
+    const l = String(lang || '').toLowerCase();
+    if (!requested.length) return l || 'und';
+    // match exact ou préfixe (pt-br -> pt)
+    const hit = requested.find(r => r === l || (l && r && (l.startsWith(r) || r.startsWith(l))));
+    return hit || (l || requested[0] || 'und');
+  };
+
+  subs.forEach((sub) => {
+    const lang = pickLang(sub.language || sub.lang || sub.iso || sub.iso639 || sub.iso639_1);
+    const release = (sub.release_name || sub.release || sub.name || sub.file_name || '').toString();
+    const author = (sub.author || sub.uploader || sub.username || '').toString();
+    const hi = (sub.hi === true || sub.hearing_impaired === true) ? 'HI' : '';
+    const dl = __subdlGetDownloadLink(sub);
+
+    const card = document.createElement('div');
+    card.className = 'subsearch-result';
+
+    const top = document.createElement('div');
+    top.className = 'subsearch-result-top';
+
+    const left = document.createElement('div');
+    left.className = 'subsearch-result-left';
+
+    const title = document.createElement('div');
+    title.className = 'subsearch-result-title';
+    title.textContent = (release ? release : 'Sous-titre') + (hi ? ' · ' + hi : '');
+
+    const meta = document.createElement('div');
+    meta.className = 'subsearch-result-meta';
+    const bits = [];
+    if (lang) bits.push(String(lang).toUpperCase());
+    if (author) bits.push(author);
+    if (sub.fps) bits.push('fps ' + sub.fps);
+    if (sub.downloads) bits.push(sub.downloads + ' dl');
+    meta.textContent = bits.join(' · ');
+
+    left.append(title, meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'subsearch-result-actions';
+
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.className = 'subsearch-mini-btn';
+    applyBtn.textContent = 'Appliquer';
+    applyBtn.title = 'Applique au player si le fichier est directement lisible (SRT/VTT). Si SubDL renvoie un ZIP, utilise Télécharger.';
+    applyBtn.addEventListener('click', async () => {
+      try {
+        if (!dl) { __subtitleSetStatus('Lien SubDL manquant.'); return; }
+        __subtitleSetStatus('Téléchargement…');
+
+        // Si SubDL renvoie un ZIP, on ne l’extrait pas ici (pas de dépendance ZIP).
+        if (/\.zip(\?|#|$)/i.test(dl)) {
+          __subtitleSetStatus('SubDL renvoie un ZIP. Clique “Télécharger”, puis importe le .srt/.vtt (menu sous-titres).');
+          return;
+        }
+
+        const res = await fetch(dl, { method: 'GET' });
+        const txt = await res.text();
+        const isVtt = /^\s*WEBVTT/i.test(txt);
+        const vtt = isVtt ? txt : __subtitleSrtToVtt(txt);
+        __subtitleAddTrackFromVttText(vtt, 'SubDL ' + String(lang || 'und').toUpperCase(), String(lang || 'und').toLowerCase());
+        __subtitleSetStatus('Sous-titre appliqué.');
+        __subtitleCloseOverlay();
+      } catch (e) {
+        console.error(e);
+        __subtitleSetStatus('Erreur: ' + (e?.message || String(e)));
+      }
+    });
+
+    const dlBtn = document.createElement('button');
+    dlBtn.type = 'button';
+    dlBtn.className = 'subsearch-mini-btn';
+    dlBtn.textContent = 'Télécharger';
+    dlBtn.addEventListener('click', () => {
+      if (!dl) { __subtitleSetStatus('Lien SubDL manquant.'); return; }
+      window.open(dl, '_blank', 'noopener');
+    });
+
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.className = 'subsearch-mini-btn';
+    openBtn.textContent = 'Ouvrir';
+    openBtn.title = 'Ouvre le lien SubDL (nouvel onglet).';
+    openBtn.addEventListener('click', () => {
+      if (!dl) return;
+      window.open(dl, '_blank', 'noopener');
+    });
+
+    actions.append(applyBtn, dlBtn, openBtn);
+
+    top.append(left);
+    card.append(top, actions);
+    subtitleSearchResults.appendChild(card);
+  });
 }
 
 function __subtitleOpenOverlay(prefillTitle = '') {
@@ -5704,316 +5917,6 @@ dlBtn.addEventListener('click', async () => {
   });
 }
 
-
-// =====================================================
-// SubDL (API) — recherche + download (ZIP) + extraction via JSZip
-// =====================================================
-
-const __SUBDL_API_BASE = 'https://api.subdl.com/api/v1/subtitles';
-const __SUBDL_DL_BASE  = 'https://dl.subdl.com';
-
-function __subdlGetApiKey() {
-  try { return (localStorage.getItem('tronAresSubdlApiKey') || '').trim(); } catch { return ''; }
-}
-function __subdlSetApiKey(k) {
-  try { localStorage.setItem('tronAresSubdlApiKey', String(k || '').trim()); } catch {}
-}
-
-function __subdlEnsureApiKey() {
-  let k = __subdlGetApiKey();
-  if (k) return k;
-  const v = prompt('Clé API SubDL manquante.\nColle ta clé SubDL (API Key) :');
-  if (v && String(v).trim()) {
-    __subdlSetApiKey(String(v).trim());
-    return String(v).trim();
-  }
-  return '';
-}
-
-function __subdlNormalizeLanguagesCsv(langsCsv) {
-  const raw = String(langsCsv || '').trim();
-  if (!raw) return '';
-  // SubDL attend plutôt des codes "EN,FR" (doc). On garde aussi les "pt-br" -> "PT-BR".
-  return raw
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-    .map(s => s.toUpperCase())
-    .join(',');
-}
-
-function __subdlGuessTypeFromEntry(entry) {
-  const t = (entry && (entry.tmdbType || entry.type)) ? String(entry.tmdbType || entry.type).toLowerCase() : '';
-  if (t === 'tv' || t === 'show' || t === 'series') return 'tv';
-  if (t === 'movie' || t === 'film') return 'movie';
-  // fallback: si SxxEyy détecté dans le titre, on suppose tv
-  const q = (subtitleSearchTitleInput?.value || '').toUpperCase();
-  if (/\bS\d{1,2}E\d{1,2}\b/.test(q)) return 'tv';
-  return 'movie';
-}
-
-function __subdlParseSxxEyy(str) {
-  const s = String(str || '').toUpperCase();
-  const m = s.match(/\bS(\d{1,2})E(\d{1,2})\b/);
-  if (!m) return null;
-  return { season: Number(m[1]), episode: Number(m[2]) };
-}
-
-async function __subdlSearchSubtitles(query, languagesCsv, entry) {
-  const apiKey = __subdlEnsureApiKey();
-  if (!apiKey) throw new Error('Clé SubDL absente.');
-  const params = new URLSearchParams();
-  params.set('api_key', apiKey);
-
-  const langs = __subdlNormalizeLanguagesCsv(languagesCsv);
-  if (langs) params.set('languages', langs);
-
-  const type = __subdlGuessTypeFromEntry(entry);
-  if (type) params.set('type', type);
-
-  // Priorité: TMDb ID si présent (plus fiable)
-  if (entry && entry.tmdbId) {
-    params.set('tmdb_id', String(entry.tmdbId));
-  } else {
-    // Sinon on tente film_name (texte)
-    if (query) params.set('film_name', String(query));
-  }
-
-  // Si c'est une série et qu'on a SxxEyy dans le champ titre, on l'utilise
-  if (type === 'tv') {
-    const se = __subdlParseSxxEyy(query);
-    if (se) {
-      params.set('season_number', String(se.season));
-      params.set('episode_number', String(se.episode));
-    }
-  }
-
-  // limite raisonnable
-  params.set('subs_per_page', '30');
-
-  const url = __SUBDL_API_BASE + '?' + params.toString();
-  const res = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
-  const txt = await res.text().catch(() => '');
-  let json = null;
-  try { json = JSON.parse(txt); } catch { json = null; }
-
-  if (!res.ok || !json || json.status !== true) {
-    const errMsg = (json && (json.error || json.message)) ? (json.error || json.message) : txt;
-    throw new Error('SubDL (' + res.status + '): ' + (errMsg || 'erreur'));
-  }
-  return json;
-}
-
-function __subdlGetSubtitleLink(sub) {
-  if (!sub || typeof sub !== 'object') return '';
-  // La doc indique un lien de forme:
-  // https://dl.subdl.com/subtitle/3197651-3213944.zip
-  const candidates = [
-    sub.link, sub.url, sub.download, sub.download_url, sub.dl, sub.dl_url,
-    sub.subtitle_link, sub.subtitle_url, sub.zip, sub.zip_url,
-    sub.path
-  ].filter(Boolean).map(String);
-
-  // Si l'objet contient un id(s), on reconstruit
-  const idA = sub.id || sub.sub_id || sub.subtitle_id || sub.sd_subtitle_id || null;
-  const idB = sub.file_id || sub.release_id || sub.sub_file_id || null;
-
-  for (const c of candidates) {
-    if (/^https?:\/\//i.test(c)) return c;
-    if (c.startsWith('/')) return __SUBDL_DL_BASE.replace(/\/+$/,'') + c;
-    if (c.includes('subtitle/')) {
-      return __SUBDL_DL_BASE.replace(/\/+$/,'') + (c.startsWith('subtitle/') ? '/' + c : '/' + c.replace(/^\/+/, ''));
-    }
-  }
-
-  // cas: doc "subtitle/{a}-{b}.zip"
-  if (idA && idB) return __SUBDL_DL_BASE.replace(/\/+$/,'') + '/subtitle/' + String(idA) + '-' + String(idB) + '.zip';
-  if (idA) return __SUBDL_DL_BASE.replace(/\/+$/,'') + '/subtitle/' + String(idA) + '.zip';
-  return '';
-}
-
-// --- Cache local SubDL (évite de reconsommer le quota + re-zip) ---
-function __subdlCacheKey(link) {
-  return 'subdl:' + String(link || '').trim();
-}
-function __subdlGetCachedVtt(link) {
-  try {
-    const k = __subdlCacheKey(link);
-    const raw = localStorage.getItem(k);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (!obj || !obj.vtt) return null;
-    // expire après 30 jours (best effort)
-    const at = obj.at ? Number(obj.at) : 0;
-    if (at && (Date.now() - at) > (30 * 24 * 60 * 60 * 1000)) {
-      try { localStorage.removeItem(k); } catch {}
-      return null;
-    }
-    return obj;
-  } catch {
-    return null;
-  }
-}
-function __subdlPutCachedVtt(link, payload) {
-  try {
-    const k = __subdlCacheKey(link);
-    const obj = Object.assign({ at: Date.now() }, payload || {});
-    localStorage.setItem(k, JSON.stringify(obj));
-  } catch {}
-}
-
-async function __subdlFetchZipAndExtractText(downloadUrl) {
-  // Télécharge le ZIP et renvoie { text, ext, fileName }
-  const res = await fetch(downloadUrl, { method: 'GET' });
-  if (!res.ok) throw new Error('Téléchargement ZIP (' + res.status + ')');
-  const ab = await res.arrayBuffer();
-
-  // Extraction ZIP via JSZip (chargé côté HTML)
-  if (typeof window.JSZip === 'undefined') {
-    throw new Error('JSZip manquant (nécessaire pour ouvrir les ZIP SubDL).');
-  }
-
-  const zip = await window.JSZip.loadAsync(ab);
-  // On cherche en priorité .srt / .vtt
-  const files = Object.keys(zip.files || {});
-  const pick = (ext) => files.find(f => f.toLowerCase().endsWith(ext));
-  const chosen =
-    pick('.srt') ||
-    pick('.vtt') ||
-    (files.length ? files[0] : null);
-
-  if (!chosen) throw new Error('ZIP vide.');
-  const fileObj = zip.files[chosen];
-  const text = await fileObj.async('string');
-
-  const lower = chosen.toLowerCase();
-  const ext = lower.endsWith('.vtt') ? 'vtt' : (lower.endsWith('.srt') ? 'srt' : 'txt');
-  const fileName = chosen.split('/').pop() || ('subtitle.' + ext);
-  return { text, ext, fileName };
-}
-
-function __subdlRenderResults(data, languagesCsv) {
-  if (!subtitleSearchResults) return;
-  subtitleSearchResults.innerHTML = '';
-
-  const subs = (data && Array.isArray(data.subtitles)) ? data.subtitles : [];
-  if (!subs.length) {
-    __subtitleSetStatus('Aucun résultat.');
-    return;
-  }
-
-  __subtitleSetStatus(subs.length + ' résultat(s).');
-
-  subs.slice(0, 30).forEach((sub) => {
-    const lang = (sub.language || sub.lang || sub.iso || sub.iso_code || '').toString();
-    const release = (sub.release || sub.release_name || sub.version || sub.title || '').toString();
-    const name = (sub.name || sub.movie_name || sub.film_name || sub.series_name || '').toString();
-    const author = (sub.author || sub.uploader || sub.username || '').toString();
-    const hi = (sub.hi != null ? !!sub.hi : (sub.hearing_impaired != null ? !!sub.hearing_impaired : null));
-    const dlCount = (sub.downloads != null ? sub.downloads : (sub.download_count != null ? sub.download_count : null));
-
-    const link = __subdlGetSubtitleLink(sub);
-    const displayTitle = (release || name || 'Sous-titres SubDL');
-
-    const card = document.createElement('div');
-    card.className = 'subsearch-item';
-
-    const top = document.createElement('div');
-    top.className = 'subsearch-item-top';
-
-    const left = document.createElement('div');
-
-    const t = document.createElement('div');
-    t.className = 'subsearch-item-title';
-    t.textContent = displayTitle;
-
-    const meta = document.createElement('div');
-    meta.className = 'subsearch-item-meta';
-    const metaParts = [];
-    if (lang) metaParts.push('Lang: ' + lang);
-    if (hi === true) metaParts.push('HI');
-    if (author) metaParts.push('By: ' + author);
-    if (dlCount != null) metaParts.push('DL: ' + dlCount);
-    if (name && release && name !== release) metaParts.push(name);
-    left.append(t, meta);
-    meta.textContent = metaParts.join(' • ');
-
-    const actions = document.createElement('div');
-    actions.className = 'subsearch-item-actions';
-
-    const applyBtn = document.createElement('button');
-    applyBtn.type = 'button';
-    applyBtn.className = 'subsearch-mini-btn';
-    applyBtn.textContent = 'Appliquer';
-    applyBtn.disabled = !link;
-
-    applyBtn.addEventListener('click', async () => {
-      if (!link) return;
-      try {
-        __subtitleSetStatus('Chargement…');
-
-        const cached = __subdlGetCachedVtt(link);
-        let vttText = cached && cached.vtt ? String(cached.vtt) : null;
-        let fileName = cached && cached.fileName ? String(cached.fileName) : '';
-
-        if (!vttText) {
-          __subtitleSetStatus('Téléchargement…');
-          const dlUrl = link;
-          const extracted = await __subdlFetchZipAndExtractText(dlUrl);
-          fileName = extracted.fileName || fileName;
-
-          if (extracted.ext === 'vtt') {
-            vttText = extracted.text;
-          } else {
-            vttText = __subtitleSrtToVtt(extracted.text);
-          }
-
-          __subdlPutCachedVtt(link, { vtt: vttText, fileName, language: lang || '', title: displayTitle });
-        } else {
-          __subtitleSetStatus('Depuis le cache…');
-        }
-
-        __subtitleAddTrackFromVttText(vttText, (lang ? ('SubDL ' + lang) : 'SubDL'), (lang || 'und'));
-        __subtitleSetStatus(cached ? 'Sous-titres appliqués (cache).' : 'Sous-titres appliqués.');
-        __subtitleCloseOverlay();
-      } catch (e) {
-        console.error(e);
-        __subtitleSetStatus('Erreur: ' + (e && e.message ? e.message : String(e)));
-      }
-    });
-
-    const dlBtn = document.createElement('button');
-    dlBtn.type = 'button';
-    dlBtn.className = 'subsearch-mini-btn';
-    dlBtn.textContent = 'Télécharger';
-    dlBtn.disabled = !link;
-
-    dlBtn.addEventListener('click', () => {
-      if (!link) return;
-      // téléchargement natif du ZIP (plus simple)
-      window.open(link, '_blank', 'noopener');
-      __subtitleSetStatus('Téléchargement lancé (ZIP).');
-    });
-
-    const openBtn = document.createElement('button');
-    openBtn.type = 'button';
-    openBtn.className = 'subsearch-mini-btn';
-    openBtn.textContent = 'Ouvrir';
-    openBtn.disabled = !link;
-    openBtn.addEventListener('click', () => {
-      if (!link) return;
-      window.open(link, '_blank', 'noopener');
-    });
-
-    actions.append(applyBtn, dlBtn, openBtn);
-
-    top.append(left);
-    card.append(top, actions);
-    subtitleSearchResults.appendChild(card);
-  });
-}
-
-
 async function __subtitleDoSearch() {
   const provider = subtitleSearchProviderSelect ? subtitleSearchProviderSelect.value : 'opensubtitles';
   const q = (subtitleSearchTitleInput?.value || '').trim();
@@ -6032,8 +5935,12 @@ async function __subtitleDoSearch() {
       const data = await __subtitleProxySearchOpenSubtitles(q, langs, currentEntry);
       __subtitleRenderResultsOpenSubtitles(data, langs);
     } else if (provider === 'subdl') {
+      if (!__subtitleIsFilmsTabActive()) {
+        __subtitleSetStatus('SubDL est disponible uniquement dans l’onglet Films.');
+        return;
+      }
       const data = await __subdlSearchSubtitles(q, langs, currentEntry);
-      __subdlRenderResults(data, langs);
+      __subtitleRenderResultsSubDL(data, langs);
     } else {
       __subtitleSetStatus('Provider non supporté pour le moment.');
     }
@@ -6047,9 +5954,6 @@ async function __subtitleDoSearch() {
 (function __bindSubtitleUiOnce(){
   if (window.__tronSubUiBound) return;
   window.__tronSubUiBound = true;
-
-  // Providers: SubDL uniquement sur l’onglet Films
-  try { __subtitleSyncProviderSelectForTab(); } catch {}
 
   subtitleSearchCloseBtn?.addEventListener('click', __subtitleCloseOverlay);
   subtitleSearchOverlay?.addEventListener('click', (e) => {

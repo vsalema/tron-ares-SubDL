@@ -13,8 +13,9 @@
   var SUBDL_LANGS = "FR,EN,PT,BR_PT";
 
   var LS_OS_KEY = "opensubtitlesApiKey";
+  var DEFAULT_opensubtitlesApiKey = 'https://www.opensubtitles.com';
   var LS_SUBDL_KEY = "subdlApiKey";
-
+  var DEFAULT_subdlApiKey= 'https://www.opensubtitles.com';
   function $(id) { return document.getElementById(id); }
 
   function isOverlayOpen() {

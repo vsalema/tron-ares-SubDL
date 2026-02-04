@@ -5,7 +5,7 @@
 # ===== Action =====
 
 #EXTM3U
-#EXTINF:-1 group-title="Films" tvg-name="Dhurandhar (2025)" tmdb-id="1291608" tvg-id="1_21ae4dey" tvg-logo="https://image.tmdb.org/t/p/original/8FHOtUpNIk5ZPEay2N2EY5lrxkv.jpg" tvg-certification=FR:18 tvg-cast="Ranveer Singh|Akshaye Khanna|R. Madhavan|Arjun Rampal|Sanjay Dutt" tvg-director="Aditya Dhar" tvg-writer="Aarsh Vora|Aditya Raj Kaul|Aditya Dhar|Irshad Kamil|Raj Ranjodh" tvg-content-id="tmdb:1291608",Dhurandhar (2025)
+#EXTINF:-1 group-title="Action" tvg-name="Dhurandhar (2025)" tmdb-id="1291608" tvg-id="1_21ae4dey" tvg-logo="https://image.tmdb.org/t/p/original/8FHOtUpNIk5ZPEay2N2EY5lrxkv.jpg" tvg-certification=FR:18 tvg-cast="Ranveer Singh|Akshaye Khanna|R. Madhavan|Arjun Rampal|Sanjay Dutt" tvg-director="Aditya Dhar" tvg-writer="Aarsh Vora|Aditya Raj Kaul|Aditya Dhar|Irshad Kamil|Raj Ranjodh" tvg-content-id="tmdb:1291608",Dhurandhar (2025)
 https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/1_21ae4dey/v/1/ev/8/flavorId/1_,6eozdkpm,zy0k602f,epqqp2lj,fws7d5g5,muwzhzan,n3nqoafm,kfk87s4l,/forceproxy/true/name/a.mp4.urlset/manifest.mpd
 
 #EXTINF:-1 group-title="Action" tvg-name="Guillaume Tell (2025)" tmdb-id="1195631" tvg-id="1_wgr74p7p" tvg-logo="https://image.tmdb.org/t/p/original/rIA80h7plU21PIK9zzZZpXviZOA.jpg" tvg-certification="FR:16" tvg-cast="Claes Bang|Connor Swindells|Golshifteh Farahani|Jonah Hauer-King|Ellie Bamber" tvg-director="Nick Hamm" tvg-writer="Nick Hamm" tvg-content-id="tmdb:1195631",Guillaume Tell (2025)
@@ -652,6 +652,11 @@ https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/
 https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/1_8dm2jc9p/v/1/ev/11/flavorId/1_,q818572p,bc8y9rol,4162jbw8,paa5n804,seibmqa7,w34m7dj4,505izf0g,/forceproxy/true/name/a.mp4.urlset/manifest.mpd
 
 # ===== Drame =====
+
+#EXTINF:-1 group-title="Drame" tvg-name="Hamnet (2025)" tmdb-id="858024" tvg-content-id="tmdb:858024" tvg-id="1_bswh3nb1" tvg-logo="https://image.tmdb.org/t/p/original/slwXcH3iTRUe9ywOa4teTSzAGeB.jpg" tvg-certification="FR:TP" tvg-cast="Jessie Buckley|Paul Mescal|Emily Watson|Joe Alwyn|Jacobi Jupe" tvg-director="Chloé Zhao" tvg-writer="Maggie O'Farrell|Chloé Zhao",Hamnet (2025)
+https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/1_bswh3nb1/v/1/ev/9/flavorId/1_,m1omcbjo,ly91dcsm,iebpuyxf,oyq283o8,le089igl,m1g25g0m,91jw80bc,f0tthgz9,jl0wdmpr,utepygdn,/forceproxy/true/name/a.mp4.urlset/manifest.mpd
+
+
 #EXTINF:-1 group-title="Drame" tvg-name="Amy Thompson, le combat d'une mère (2020)" tmdb-id="673553" tvg-id="1_xhv9q5c6" tvg-logo="https://cfvod.kaltura.com/p/3253003/sp/325300300/thumbnail/entry_id/1_xhv9q5c6/version/100001/width/800/height/450" tvg-cast="Lyndsy Fonseca|Kirstie Alley|Jason Burkey|Hunter Burke|Diane Robin" tvg-director="Tori Garrett" tvg-writer="Karen Leigh Hopkins" tvg-content-id="tmdb:673553", le combat d'une mère (2020)
 https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/1_xhv9q5c6/v/1/ev/11/flavorId/1_,22su81sj,ygn4sfxj,6fu0995e,cvdh6ez6,1bba1hz8,iit4yek2,rtpx9djm,/forceproxy/true/name/a.mp4.urlset/manifest.mpd
 
@@ -1147,6 +1152,9 @@ https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/
 
 # ===== Thriller =====
 
+#EXTINF:-1 group-title="Mystère" tvg-name="La Femme de ménage (2025)" tmdb-id="1368166" tvg-content-id="tmdb:1368166" tvg-id="1_qluhtpul" tvg-logo="https://image.tmdb.org/t/p/original/szdrVdnS8XAzqFyzPDhYXaJk7EK.jpg" tvg-certification="FR:12" tvg-cast="Sydney Sweeney|Amanda Seyfried|Brandon Sklenar|Michele Morrone|Indiana Elle" tvg-director="Paul Feig" tvg-writer="Rebecca Sonnenshine|Freida McFadden",La Femme de ménage (2025)
+https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/1_qluhtpul/v/1/ev/10/flavorId/1_,0omfe09q,5rz7cx6t,fwj3qkj8,u74a5hbg,cbokj3uz,nbxdgcg1,k6cj8cek,7dyozlhf,rzs7v09d,s7b4jouq,/forceproxy/true/name/a.mp4.urlset/manifest.mpd
+
 #EXTINF:-1 group-title="Thriller" tvg-name="Centigrade (2022)" tmdb-id="680028" tvg-id="1_rn7pmwqn" tvg-logo="https://cfvod.kaltura.com/p/3253003/sp/325300300/thumbnail/entry_id/1_rn7pmwqn/version/100011/width/800/height/450" tvg-certification="FR:12" tvg-cast="Genesis Rodriguez|Vincent Piazza|Benjamin Sokolow|Emily Bayiokos" tvg-director="Brendan Walsh" tvg-writer="Brendan Walsh|Daley Nixon" tvg-content-id="tmdb:680028",Centigrade (2022)
 https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/1_rn7pmwqn/v/1/ev/11/flavorId/1_,tkz14yxs,t54m8w85,bvpvxjs5,057iafxr,7c5ad1y0,25osa3if,/forceproxy/true/name/a.mp4.urlset/manifest.mpd
 
@@ -1249,6 +1257,10 @@ https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/
 
 #EXTINF:-1 group-title="Western" tvg-name="The Old Way (2023)" tmdb-id="872954" tvg-id="1_9g7ldrzd" tvg-logo="https://cfvod.kaltura.com/p/3253003/sp/325300300/thumbnail/entry_id/1_9g7ldrzd/version/100051/width/800/height/450" tvg-certification="FR:16" tvg-cast="Nicolas Cage|Ryan Kiera Armstrong|Noah Le Gros|Clint Howard|Shiloh Fernandez" tvg-director="Brett Donowho" tvg-writer="Carl W. Lucas" tvg-content-id="tmdb:872954",The Old Way (2023)
 https://kalhlspd-a.akamaihd.net/dash/p/3253003/sp/325300300/serveFlavor/entryId/1_9g7ldrzd/v/1/ev/11/flavorId/1_,5sbzaaa8,eqcflssd,391pom0k,77b8zo5z,kpi67rov,90hax344,tckp6f82,/forceproxy/true/name/a.mp4.urlset/manifest.mpd
+
+
+
+
 
 
 

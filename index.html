@@ -3,18 +3,6 @@
   Copyright © Salema vitor
   All rights reserved
 -->
-
-<script>
-  window.aclib = {
-    runPop: function() {
-      zoneId: '10628474',
-      console.warn("aclib.runPop a été bloqué");
-    }
-  };
-</script>
-
-
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -451,24 +439,7 @@
 <script defer src="subdl-lang-sync.apikey.v7.js"></script>
 
 <script defer type="text/javascript" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  var scripts = document.querySelectorAll("script[src*='aclib']");
-
-  scripts.forEach(function(s) {
-    s.parentNode.removeChild(s);
-    console.log("Script acLib supprimé :", s.src);
-  });
-});
-</script>
-<script>
-if (typeof aclib !== "undefined") {
-  aclib.runPop = function() {
-    zoneId: '10628474',
-    console.warn("aclib.runPop bloqué par l'utilisateur");
-  };
-}
-</script>
+  
   <script defer src="webtor-rect-overlay.v12.js"></script>
   <script defer src="webtor-torrents-ui.v10.js"></script>
   <script defer src="webtor-refresh-tabs.v4.js"></script>
